@@ -2,31 +2,32 @@ import bs4
 import requests
 import sys
 
+
+
 class portfolio_manager:
 
-    def help(self):
-        sys.stdout.write("""Usage :-
-        $ ./getFunds [Arg1: filename.txt] [optional Arg] [Arg2: outputFileName.csv]
-
-        Optional Argument:  -ft   , gets data from https://markets.ft.com
-                            -br   , gets data from https://www.boursorama.com default
-
-        $ ./getFunds --help or -h		# Show usage
-
-        Example: $ ./getFunds.py fundcodes.txt -ft funds_ft.csv
-                $ ./getFunds.py fundcodes.txt funds_br.csv\n""")
-        exit()
-
     def getFunds(self):
-        if len(sys.argv) > 1:
-            file_name = sys.argv[1]
-            output_file_name = sys.argv[-1]
-            
-        with open(file_name, 'r') as file:
-            fund_codes = file.readlines()
-            
-        print("Getting ISIN codes from file...")
-        isin_codes=[i.strip() for i in fund_codes]
+        file_name = "INPUTS/transactions.csv"
+        
+        print("Reading transactions.csv...\nPlease Wait")
+
+        with open(file_name, "r") as csvfile:
+            lines = csvfile.readlines()
+
+        transaction_dict = {}
+        first = 0
+        for line in lines:
+            if (first == 0):
+                first = 1
+            else:
+                strip_vect = line.strip(',')
+                isin        = strip_vect[2]
+                type        = strip_vect[0]
+                stock_name  = strip_vect[1]
+                date        = strip_vect[3]
+                quantity    = strip_vect[4]
+                value       = strip_vect[5]
+                transaction_dict[isin] = [type, stock_name, date, quantity, value]
 
         if sys.argv[-2] =='-ft':
             url = 'https://markets.ft.com/data/funds/tearsheet/summary?s='
@@ -39,8 +40,9 @@ class portfolio_manager:
         price_list = []
 
         print("Getting Prices...\nPlease Wait")
-        for i in range(len(isin_codes)):
-            res = requests.get(url+ isin_codes[i], headers={'User-Agent': 'Mozilla/5.0'})
+        
+        for isin in transaction_dict.keys():
+            res = requests.get(url+ isin, headers={'User-Agent': 'Mozilla/5.0'})
             
             #Checking for Bad download
             try:
@@ -52,35 +54,28 @@ class portfolio_manager:
             soup_res = bs4.BeautifulSoup(res.text, 'html.parser')
             
             try:
-                if sys.argv[-2] =='-ft':
-                    name = soup_res.find('h1', {'class':'mod-tearsheet-overview__header__name mod-tearsheet-overview__header__name--large'})
-                    price = soup_res.find('span',{'class':'mod-ui-data-list__value'})
-                    #print(name.text,price.text)
-                    name_list.append(name.text)
-                    price_list.append(price.text.replace(',', ''))
+                #if sys.argv[-2] =='-ft':
+                name = soup_res.find('h1', {'class':'mod-tearsheet-overview__header__name mod-tearsheet-overview__header__name--large'})
+                price = soup_res.find('span',{'class':'mod-ui-data-list__value'})
+                #print(name.text,price.text)
+                name_list.append(name.text)
+                price_list.append(price.text.replace(',', ''))
 
-                else:
-                    name = soup_res.find('a',{'class' : 'c-faceplate__company-link'})
-                    price = soup_res.find('span',{'class' : 'c-instrument c-instrument--last'})
-                    
-                    name_list.append(name.text.strip())
-                    price_list.append(''.join(price.text.split()))
+                #else:
+                #    name = soup_res.find('a',{'class' : 'c-faceplate__company-link'})
+                #    price = soup_res.find('span',{'class' : 'c-instrument c-instrument--last'})
+                #    
+                #    name_list.append(name.text.strip())
+                #    price_list.append(''.join(price.text.split()))
                     
             except:
                 name_list.append('NA')
                 price_list.append('NA')
                 continue
 
-        with open(output_file_name, 'w', encoding='utf-8') as f:
-            print('Saving File as', output_file_name)
-            for code, name, price in zip(isin_codes, name_list, price_list):
-                f.write(code + ", " + name + ", " + price + "\n")
 
     def main(self):
-        if len(sys.argv)==1 or sys.argv[1]== '--help' or sys.argv[1]=='-h' or len(sys.argv)>4:
-            self.help()
-        else:
-            self.getFunds()
+        self.getFunds()
 
     if __name__=="__main__": 
         main()
