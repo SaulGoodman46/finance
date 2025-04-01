@@ -63,8 +63,10 @@ class portfolio_manager:
 
         # Recupera i dati dell'azione utilizzando il ticker
         stock = yf.Ticker(ticker)
-        stock_info = stock.info
-        current_price = stock_info.get('currentPrice')
+
+        # Ottieni il prezzo attuale
+        current_price = stock.history(period="1d")["Close"].iloc[-1]
+        print(f"Il prezzo attuale di {ticker} è: {current_price}")
 
         if current_price is None:
             raise ValueError(f"Prezzo non disponibile per il ticker: {ticker}")
@@ -81,6 +83,7 @@ class portfolio_manager:
             tmp_dict["cprice"] = self.get_stock_price_by_ticker(key)
             tmp_dict["cvalue"] = tmp_dict["cprice"] * tmp_dict["quantity"]
             tmp_dict["profit"] = tmp_dict["cvalue"] - (tmp_dict["value"] * tmp_dict["quantity"])
+            print(f"Profit for {tmp_dict['stock_name']} is {tmp_dict['profit']}")
 
             stock_dict[key] = tmp_dict
 
@@ -94,16 +97,22 @@ class portfolio_manager:
 
         # Compute relative weight
         for key, value in stock_dict.items():
-            stock_dict[key]["rel_weight"] = math.floor((value["cprice"] * value["quantity"]) / total_value)
+            stock_dict[key]["rel_weight"] = math.floor(((value["cprice"] * value["quantity"]) / total_value)*100)
+            print(f"Total value of {value["stock_name"]} is {(value["cprice"] * value["quantity"])}\n")
+            print(f"Relative weight of {value["stock_name"]} is {value['rel_weight']}%\n")
 
         name_list = []
         for key, value in stock_dict.items():
             name_list.append(value["stock_name"])
+
+        print(name_list)
         
         rel_value_list = []
         for key, value in stock_dict.items():
             rel_value_list.append(value["rel_weight"])
         
+        print(rel_value_list)
+
         y = np.array(rel_value_list)
         mylabels = list(name_list)
 
