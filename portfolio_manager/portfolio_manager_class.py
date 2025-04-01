@@ -3,6 +3,8 @@ import subprocess
 import platform
 import matplotlib.pyplot as plt
 import numpy as np
+import math
+import pandas as pd
 
 class portfolio_manager:
 
@@ -36,30 +38,26 @@ class portfolio_manager:
         
         print("Reading transactions.csv...\nPlease Wait")
 
-        with open(file_name, "r") as csvfile:
-            lines = csvfile.readlines()
+        df = pd.read_csv(file_name)
 
         transaction_dict = {}
         first = 0
-        for line in lines:
-            strip_vect = line.strip(',')
-            tmp_dict = {}
-            if (first == 0):
-                first = 1
-            elif (len(strip_vect) > 4):
-                ticker        = strip_vect[2]
-                tmp_dict["type"]        = strip_vect[0]
-                tmp_dict["stock_name"]  = strip_vect[1]
-                tmp_dict["date"]        = strip_vect[3]
-                tmp_dict["quantity"]    = strip_vect[4]
-                tmp_dict["value"]       = strip_vect[5]
-                transaction_dict[ticker] = tmp_dict
+        tmp_dict = {}
+        for row in df.values:
+            ticker                  = row[2].strip()
+            print(f"Ticker: {ticker} found\n in row {row}")
+            tmp_dict["type"]        = row[0]
+            tmp_dict["stock_name"]  = row[1]
+            tmp_dict["date"]        = row[3]
+            tmp_dict["quantity"]    = row[4]
+            tmp_dict["value"]       = row[5]
+            transaction_dict[ticker] = tmp_dict
 
-                print(f"Loaded ticker {ticker} with values {tmp_dict[ticker]}")
+            print(f"Loaded ticker {ticker} with values {transaction_dict[ticker]}")
 
         return transaction_dict
     
-    def get_stock_price_by_ticker(ticker):
+    def get_stock_price_by_ticker(self, ticker):
         if not ticker:
             raise ValueError(f"Ticker not found: {ticker}")
 
@@ -77,7 +75,7 @@ class portfolio_manager:
         for key in stock_dict.keys():
             tmp_dict = stock_dict[key]
 
-            
+            print(f"Downloading ticker {key} value")
             print(f"Ticker: {key} found value {self.get_stock_price_by_ticker(key)}")
             
             tmp_dict["cprice"] = self.get_stock_price_by_ticker(key)
@@ -89,20 +87,46 @@ class portfolio_manager:
 
     def plot_portfolio_chart(self, stock_dict):
         
+        # compute total value
+        total_value = 0
+        for key, value in stock_dict.items():
+            total_value += value["cprice"] * value["quantity"]
+
+        # Compute relative weight
+        for key, value in stock_dict.items():
+            stock_dict[key]["rel_weight"] = math.floor((value["cprice"] * value["quantity"]) / total_value)
+
+        name_list = []
+        for key, value in stock_dict.items():
+            name_list.append(value["stock_name"])
         
-        y = np.array(list(stock_dict.values()))
-        mylabels = list(stock_dict.keys())
+        rel_value_list = []
+        for key, value in stock_dict.items():
+            rel_value_list.append(value["rel_weight"])
+        
+        y = np.array(rel_value_list)
+        mylabels = list(name_list)
 
 
         plt.pie(y, labels = mylabels)
-        plt.show() 
+        plt.show()
+
+    def run(self):
+        # Read transactions from the CSV file
+        transaction_dict = self.read_csv()
+
+        # Get the current values of the stocks in the portfolio
+        self.get_current_values(transaction_dict)
+
+        # Plot the portfolio chart
+        self.plot_portfolio_chart(transaction_dict)
 
 ## Main
 
 mng = portfolio_manager()
 if mng.ping('google.com'):
     print("Internet connection is active.")
-    mng.getFunds()
+    mng.run()
 else:
     print("Internet connection is down.")
 
