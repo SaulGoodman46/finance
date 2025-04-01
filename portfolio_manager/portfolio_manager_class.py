@@ -1,6 +1,4 @@
-import bs4
-import requests
-import sys
+import yfinance as yf
 import subprocess
 import platform
 import matplotlib.pyplot as plt
@@ -33,7 +31,7 @@ class portfolio_manager:
         # Check the return code
         return response.returncode == 0
 
-    def getFunds(self):
+    def read_csv(self):
         file_name = "INPUTS/transactions.csv"
         
         print("Reading transactions.csv...\nPlease Wait")
@@ -45,62 +43,52 @@ class portfolio_manager:
         first = 0
         for line in lines:
             strip_vect = line.strip(',')
+            tmp_dict = {}
             if (first == 0):
                 first = 1
             elif (len(strip_vect) > 4):
-                isin        = strip_vect[2]
-                type        = strip_vect[0]
-                stock_name  = strip_vect[1]
-                date        = strip_vect[3]
-                quantity    = strip_vect[4]
-                value       = strip_vect[5]
-                transaction_dict[isin] = [type, stock_name, date, quantity, value]
+                ticker        = strip_vect[2]
+                tmp_dict["type"]        = strip_vect[0]
+                tmp_dict["stock_name"]  = strip_vect[1]
+                tmp_dict["date"]        = strip_vect[3]
+                tmp_dict["quantity"]    = strip_vect[4]
+                tmp_dict["value"]       = strip_vect[5]
+                transaction_dict[ticker] = tmp_dict
 
-        print(isin, type, stock_name, date, quantity, value)
+                print(f"Loaded ticker {ticker} with values {tmp_dict[ticker]}")
 
-        url = 'https://markets.ft.com/data/funds/tearsheet/summary?s='
+        return transaction_dict
+    
+    def get_stock_price_by_ticker(ticker):
+        if not ticker:
+            raise ValueError(f"Ticker not found: {ticker}")
 
+        # Recupera i dati dell'azione utilizzando il ticker
+        stock = yf.Ticker(ticker)
+        stock_info = stock.info
+        current_price = stock_info.get('currentPrice')
 
-        #print(isin_codes)
-        name_list = []
-        price_list = []
+        if current_price is None:
+            raise ValueError(f"Prezzo non disponibile per il ticker: {ticker}")
 
-        print("Getting Prices...\nPlease Wait")
-        
-        for isin in transaction_dict.keys():
-            res = requests.get(url+ isin, headers={'User-Agent': 'Mozilla/5.0'})
+        return current_price
+
+    def get_current_values(self, stock_dict):
+        for key in stock_dict.keys():
+            tmp_dict = stock_dict[key]
+
             
-            #Checking for Bad download
-            try:
-                res.raise_for_status()
-            except Exception as exc:
-                print("There was a problem: %s" % (exc))
+            print(f"Ticker: {key} found value {self.get_stock_price_by_ticker(key)}")
             
-            #making soup
-            soup_res = bs4.BeautifulSoup(res.text, 'html.parser')
-            
-            try:
-                #if sys.argv[-2] =='-ft':
-                name = soup_res.find('h1', {'class':'mod-tearsheet-overview__header__name mod-tearsheet-overview__header__name--large'})
-                price = soup_res.find('span',{'class':'mod-ui-data-list__value'})
-                #print(name.text,price.text)
-                name_list.append(name.text)
-                price_list.append(price.text.replace(',', ''))
+            tmp_dict["cprice"] = self.get_stock_price_by_ticker(key)
+            tmp_dict["cvalue"] = tmp_dict["cprice"] * tmp_dict["quantity"]
+            tmp_dict["profit"] = tmp_dict["cvalue"] - (tmp_dict["value"] * tmp_dict["quantity"])
 
-                print(f"Found ISIN {isin}, called {name} with price {price}\n")
+            stock_dict[key] = tmp_dict
 
-                #else:
-                #    name = soup_res.find('a',{'class' : 'c-faceplate__company-link'})
-                #    price = soup_res.find('span',{'class' : 'c-instrument c-instrument--last'})
-                #    
-                #    name_list.append(name.text.strip())
-                #    price_list.append(''.join(price.text.split()))
-                    
-            except:
-                name_list.append('NA')
-                price_list.append('NA')
-                continue
+
     def plot_portfolio_chart(self, stock_dict):
+        
         
         y = np.array(list(stock_dict.values()))
         mylabels = list(stock_dict.keys())

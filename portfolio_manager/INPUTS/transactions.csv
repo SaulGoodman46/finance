@@ -1,4 +1,4 @@
-Type, Name, ISIN, Date, Quantity, Value
+Type, Name, Ticker, Date, Quantity, Value
 
-buy, VanEck Defense, IE000YYE6WK5, 28/03/2025, 6, 41.01
-buy, Amundi Europe 600, LU0908500753, 01/04/2025, 3, 253.55
+buy, VanEck Defense, DFNS, 28/03/2025, 6, 41.01
+buy, Amundi Europe 600, MEUD, 01/04/2025, 3, 253.55
