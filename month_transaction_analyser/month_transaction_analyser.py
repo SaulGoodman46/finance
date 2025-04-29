@@ -1,13 +1,13 @@
 import pandas as pd
 import os
 
-def analizza_transazioni(df):
+def analizza_transazioni(df, mese_selezionato):
     """
-    Analizza le transazioni finanziarie di un dato mese.
+    Analizza le transazioni finanziarie per il mese selezionato.
 
     Args:
-        df (pd.DataFrame): DataFrame contenente i dati delle transazioni
-                           con le colonne 'Data', 'Entrate', 'Uscite', 'Descrizione', 'Descrizione_Completa'.
+        df (pd.DataFrame): DataFrame contenente i dati delle transazioni.
+        mese_selezionato (str): Mese da elaborare nel formato 'MM/AAAA'.
 
     Returns:
         tuple: Un tuple contenente:
@@ -16,13 +16,8 @@ def analizza_transazioni(df):
                    - float: Somma delle spese con carta di credito da accreditare.
                    - pd.DataFrame: DataFrame filtrato per il mese e con le modifiche applicate.
     """
-    mese_da_elaborare = input("Inserisci il mese che vuoi elaborare (formato MM/AAAA): ")
-
-    # Converti la colonna 'Data' in formato datetime
-    df['Data'] = pd.to_datetime(df['Data'], format='%d/%m/%Y')
-
     # Filtra il DataFrame per il mese selezionato
-    df_mese = df[df['Data'].dt.strftime('%m/%Y') == mese_da_elaborare].copy()
+    df_mese = df[df['Data'].dt.strftime('%m/%Y') == mese_selezionato].copy()
 
     # Calcola la somma delle entrate
     somma_entrate = df_mese['Entrate'].fillna(0).sum()
@@ -38,15 +33,15 @@ def analizza_transazioni(df):
         uscita = row['Uscite']
 
         if pd.notna(uscita):
-            if "Wind Tre" in descrizione:  # Modifica basata sulla colonna 'Descrizione'
+            if "Wind Tre" in descrizione:
                 spese_totali.at[index] = -10
-            elif "Scalable" in descrizione_completa:  # Eliminazione basata su 'Descrizione_Completa'
+            elif "Scalable" in descrizione_completa:
                 spese_totali.at[index] = 0
-            elif "Ricarica carta ricaricabile" in descrizione:  # Eliminazione basata su 'Descrizione'
+            elif "Ricarica carta ricaricabile" in descrizione:
                 spese_totali.at[index] = 0
-            elif "MONOFUNZIONE CONTACTLESS CHIP 5100 **** **** 8057" in descrizione:  # Conteggio speciale basato su 'Descrizione_Completa'
+            elif "MONOFUNZIONE CONTACTLESS CHIP 5100 **** **** 8057" in descrizione_completa:
                 spese_carta_credito += abs(uscita)
-                pass # Manteniamo l'uscita nel totale generale
+                pass
 
     # Rimuovi le righe con spese azzerate
     df_mese = df_mese[spese_totali != 0].copy()
@@ -57,7 +52,6 @@ def analizza_transazioni(df):
     return somma_entrate, somma_spese, spese_carta_credito, df_mese
 
 # --- Esempio di utilizzo ---
-# Assicurati di avere la libreria pandas installata: pip install pandas
 excel_file = None
 for filename in os.listdir():
     if "movements_" in filename:
@@ -66,14 +60,44 @@ for filename in os.listdir():
 
 if excel_file:
     df = pd.read_excel(excel_file)
-    entrate, spese, carta_credito, df_filtrato = analizza_transazioni(df)
 
-    print(f"Somma delle entrate del mese: {entrate:.2f} €")
-    print(f"Somma delle spese del mese (dopo modifiche): {spese:.2f} €")
+    # Converti la colonna 'Data' in formato datetime (se non lo è già)
+    df['Data'] = pd.to_datetime(df['Data'], format='%d/%m/%Y', errors='coerce')
+    df.dropna(subset=['Data'], inplace=True) # Rimuovi eventuali date non valide
+
+    # Trova gli ultimi due anni presenti nei dati
+    anni_presenti = sorted(df['Data'].dt.year.unique(), reverse=True)[:2]
+    mesi_disponibili = []
+    for anno in anni_presenti:
+        mesi_anno = sorted(df[df['Data'].dt.year == anno]['Data'].dt.strftime('%m').unique())
+        for mese in mesi_anno:
+            mesi_disponibili.append(f"{mese}/{anno}")
+
+    # Chiedi all'utente di scegliere tra i mesi disponibili
+    print("Seleziona il mese che vuoi elaborare:")
+    for i, mese in enumerate(mesi_disponibili):
+        print(f"{i + 1}. {mese}")
+
+    while True:
+        try:
+            scelta = int(input("Inserisci il numero corrispondente al mese: "))
+            if 1 <= scelta <= len(mesi_disponibili):
+                mese_selezionato = mesi_disponibili[scelta - 1]
+                break
+            else:
+                print("Scelta non valida. Inserisci un numero dalla lista.")
+        except ValueError:
+            print("Input non valido. Inserisci un numero.")
+
+    entrate, spese, carta_credito, df_filtrato = analizza_transazioni(df.copy(), mese_selezionato)
+
+    print(f"\nSomma delle entrate del mese di {mese_selezionato}: {entrate:.2f} €")
+    print(f"Somma delle spese del mese di {mese_selezionato} (dopo modifiche): {spese:.2f} €")
     print(f"Spese con carta di credito da accreditare il 10 del mese successivo: {carta_credito:.2f} €")
 
     # Salva il DataFrame filtrato in un nuovo file Excel
-    df_filtrato.to_excel("transazioni_filtrate.xlsx", index=False)
-    print("Il file 'transazioni_filtrate.xlsx' è stato generato.")
+    df_filtrato.to_excel(f"transazioni_filtrate_{mese_selezionato.replace('/', '_')}.xlsx", index=False)
+    print(f"Il file 'transazioni_filtrate_{mese_selezionato.replace('/', '_')}.xlsx' è stato generato.")
+
 else:
     print("Nessun file Excel con 'movements_' nel nome trovato nella cartella corrente.")
