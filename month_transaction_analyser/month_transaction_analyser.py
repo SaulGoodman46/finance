@@ -40,10 +40,27 @@ selected_month = available_months[choice - 1]
 # Filter data for the selected month
 df_month = df[df['Month'] == selected_month]
 
+# Sum transfer to investments
+df_transfer_investments = df_month[df_month['Full_Description'].str.contains('Trasferimento Scalable', na=False)]
+total_transfer_investments = df_transfer_investments['Expenses'].sum(skipna=True)
+
+# Exclude expenses with specific descriptions
+df_month_filtered = df_month[
+    ~df_month['Description'].str.contains('Ricarica carta ricaricabile', na=False) &
+    ~df_month['Description'].str.contains('Utilizzo carta di credito', na=False) &
+    ~df_month['Full_Description'].str.contains('Trasferimento Scalable', na=False)
+]
+
 # Calculate sums
-total_income = df_month['Income'].sum(skipna=True)
-total_expenses = df_month['Expenses'].sum(skipna=True)
+total_income = df_month_filtered['Income'].sum(skipna=True)
+total_expenses = df_month_filtered['Expenses'].sum(skipna=True)
+
+# Sum credit card expenses
+df_credit_card = df_month[df_month['Description'].str.contains('5100 \*\*\*\* \*\*\*\* 8057', na=False)]
+total_credit_card_expenses = df_credit_card['Expenses'].sum(skipna=True)
 
 print(f"\nResults for {selected_month}:")
-print(f"Total Income: {total_income:.2f} €")
-print(f"Total Expenses: {total_expenses:.2f} €")
+print(f"Total Income: {abs(total_income):.2f} €")
+print(f"Total Expenses: {abs(total_expenses):.2f} €")
+print(f"Spese carta di credito: {abs(total_credit_card_expenses):.2f} €")
+print(f"Trasferimenti per investimenti: {abs(total_transfer_investments):.2f} €")
