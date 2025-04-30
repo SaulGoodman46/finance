@@ -1,6 +1,40 @@
 import pandas as pd
 import glob
 import os
+import tkinter as tk
+from tkinter import ttk, messagebox
+
+# Function to perform calculations and update results
+def calculate():
+    selected_month = month_var.get()
+    if not selected_month:
+        messagebox.showwarning("Selection Error", "Please select a month.")
+        return
+
+    df_month = df[df['Month'] == selected_month]
+
+    df_transfer_investments = df_month[df_month['Full_Description'].str.contains('Trasferimento Scalable', na=False)]
+    total_transfer_investments = df_transfer_investments['Expenses'].sum(skipna=True)
+
+    df_month_filtered = df_month[
+        ~df_month['Description'].str.contains('Ricarica carta ricaricabile', na=False) &
+        ~df_month['Description'].str.contains('Utilizzo carta di credito', na=False) &
+        ~df_month['Full_Description'].str.contains('Trasferimento Scalable', na=False)
+    ]
+
+    total_income = df_month_filtered['Income'].sum(skipna=True)
+    total_expenses = df_month_filtered['Expenses'].sum(skipna=True)
+
+    df_credit_card = df_month[df_month['Description'].str.contains('5100 \*\*\*\* \*\*\*\* 8057', na=False)]
+    total_credit_card_expenses = df_credit_card['Expenses'].sum(skipna=True)
+
+    result_text.set(
+        f"Results for {selected_month}:\n"
+        f"Total Income: {abs(total_income):.2f} €\n"
+        f"Total Expenses: {abs(total_expenses):.2f} €\n"
+        f"Spese carta di credito: {abs(total_credit_card_expenses):.2f} €\n"
+        f"Trasferimenti per investimenti: {abs(total_transfer_investments):.2f} €"
+    )
 
 # Find the first Excel file starting with 'movements' in the current directory
 files = glob.glob('movements*.xlsx')
@@ -9,7 +43,6 @@ if not files:
     exit()
 
 file_path = files[0]
-print(f"Opening file: {file_path}")
 
 # Load the Excel file
 df = pd.read_excel(file_path, skiprows=5)
@@ -27,40 +60,23 @@ df['Expenses'] = pd.to_numeric(df['Expenses'], errors='coerce')
 # Create a column with the month in 'YYYY-MM' format
 df['Month'] = df['Date'].dt.to_period('M').astype(str)
 
-# Show available months
 available_months = df['Month'].dropna().unique()
-print("Available months:")
-for i, month in enumerate(available_months):
-    print(f"{i+1}. {month}")
 
-# Ask user to select a month
-choice = int(input("Select the number of the month you want to analyze: "))
-selected_month = available_months[choice - 1]
+# Create GUI
+root = tk.Tk()
+root.title("Monthly Movements Analyzer")
 
-# Filter data for the selected month
-df_month = df[df['Month'] == selected_month]
+month_var = tk.StringVar()
+result_text = tk.StringVar()
 
-# Sum transfer to investments
-df_transfer_investments = df_month[df_month['Full_Description'].str.contains('Trasferimento Scalable', na=False)]
-total_transfer_investments = df_transfer_investments['Expenses'].sum(skipna=True)
+ttk.Label(root, text="Select a month:").pack(pady=5)
+month_cb = ttk.Combobox(root, textvariable=month_var, values=sorted(available_months))
+month_cb.pack(pady=5)
 
-# Exclude expenses with specific descriptions
-df_month_filtered = df_month[
-    ~df_month['Description'].str.contains('Ricarica carta ricaricabile', na=False) &
-    ~df_month['Description'].str.contains('Utilizzo carta di credito', na=False) &
-    ~df_month['Full_Description'].str.contains('Trasferimento Scalable', na=False)
-]
+calc_btn = ttk.Button(root, text="Calculate", command=calculate)
+calc_btn.pack(pady=5)
 
-# Calculate sums
-total_income = df_month_filtered['Income'].sum(skipna=True)
-total_expenses = df_month_filtered['Expenses'].sum(skipna=True)
+result_label = ttk.Label(root, textvariable=result_text, justify="left")
+result_label.pack(pady=10)
 
-# Sum credit card expenses
-df_credit_card = df_month[df_month['Description'].str.contains('5100 \*\*\*\* \*\*\*\* 8057', na=False)]
-total_credit_card_expenses = df_credit_card['Expenses'].sum(skipna=True)
-
-print(f"\nResults for {selected_month}:")
-print(f"Total Income: {abs(total_income):.2f} €")
-print(f"Total Expenses: {abs(total_expenses):.2f} €")
-print(f"Spese carta di credito: {abs(total_credit_card_expenses):.2f} €")
-print(f"Trasferimenti per investimenti: {abs(total_transfer_investments):.2f} €")
+root.mainloop()
